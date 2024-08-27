@@ -8,6 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MossadAgentsApi.Data;
 using MossadAgentsApi.Models;
+using static MossadAgentsApi.Logic;
+using System.Text.Json;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+
 
 namespace MossadAgentsApi.Controllers
 {
@@ -15,6 +19,8 @@ namespace MossadAgentsApi.Controllers
     [ApiController]
     public class TargetsController : ControllerBase
     {
+
+        
         private readonly ApplicationDbContext _context;
 
         public TargetsController(ApplicationDbContext context)
@@ -75,47 +81,153 @@ namespace MossadAgentsApi.Controllers
         }
 
         [HttpPut("{id}/pin")]
-        public async Task<IActionResult> PutTarget(int id, Target target, [FromBody] Target x, Target y)
+        public async Task<IActionResult> PutTargetPin(int id, int x, int y)
         {
-            if (id != target.Id)
+            var target = await _context.Targets.FindAsync(id);
+           
+            if (target == null)
             {
                 return BadRequest();
             }
-
-
-            target = Target.FirstOrDefault(ta => ta.Id == id);
-            target.x = x;
-            target.y = y;
-            //_context.Entry(target).State = EntityState.Modified;
-
-            try
+            else
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!TargetExists(id))
+                target.x = x;
+                target.y = y;
+                
+                try
                 {
-                    return NotFound();
+                    await _context.SaveChangesAsync();
+
+                    var mission = _context.Missions.Where(mis => mis.status == Enum.MissionsStatus.option).ToList();
+                    if (mission.Count != 0)
+                    {
+                        _context.Missions.RemoveRange(mission);
+                        await _context.SaveChangesAsync();
+
+                    }
+
+
+                    var agents = await _context.Agents.ToListAsync();
+                    var targets = await _context.Targets.ToListAsync();
+                    List<Mission> missions = Logic.AgentToTarget(agents, targets);
+                    _context.Missions.AddRange(missions);
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!TargetExists(id))
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
+            return NoContent();
+        }
+
+        [HttpPut("{id}/move")]
+        public async Task<IActionResult> PutTargetMove(int id, string direction)
+        {
+            var target = await _context.Targets.FindAsync(id);
+            string error = string.Empty;
+
+            if (target == null)
+            {
+                return BadRequest();
+            }
+            else
+            {
+                int x = target.x;
+                int y = target.y;
+                if (x != 0 ) // if target dont have begin location
+                {
+
+                    if (target.Status == 1)
+                    {
+                        Logic.MoveAgentOrTarget(ref x, ref y, direction);
+
+                        if (x <= Logic.Xlenght && x > 0 && y <= Logic.Ylenght && y > 0)
+                        {
+                            target.x = x;
+                            target.y = y;
+                        }
+                        else
+                        {
+                            error = "Cannot move outside the matrix.";
+                        }
+                    }
+                    else // target is running or dead
+                    {
+                        if (target.Status == 2)
+                        {
+                            error = "target is in a running";
+                        }
+                        else
+                        {
+                            error = "target is dead";
+                        }
+                       
+                    }
                 }
                 else
                 {
-                    throw;
+                    error = "target dont have begin location";
+                }
+
+                if (error != string.Empty)
+                {
+                    return StatusCode(400, new { error, });
+                }
+
+
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+
+                    var mission = _context.Missions.Where(mis => mis.status == Enum.MissionsStatus.option).ToList();
+                    if (mission.Count != 0)
+                    {
+                        _context.Missions.RemoveRange(mission);
+                        await _context.SaveChangesAsync();
+
+                    }
+
+
+                    var agents = await _context.Agents.ToListAsync();
+                    var targets = await _context.Targets.ToListAsync();
+                    List<Mission> missions = Logic.AgentToTarget(agents, targets);
+                    _context.Missions.AddRange(missions);
+                    await _context.SaveChangesAsync();
+
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!TargetExists(id))
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
             }
-
             return NoContent();
         }
 
         // POST: api/Targets
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Target>> PostTarget(Target target)
+        public async Task<string> PostTarget(Target target)
         {
             _context.Targets.Add(target);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetTarget", new { id = target.Id }, target);
+            return JsonSerializer.Serialize(new { target.Id});
         }
 
         // DELETE: api/Targets/5

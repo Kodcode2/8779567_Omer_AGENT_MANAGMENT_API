@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
 using System.Drawing;
+using MossadAgentsApi.Enum;
 
 namespace MossadAgentsApi.Models
 {
@@ -14,9 +15,8 @@ namespace MossadAgentsApi.Models
         public int Id { get; set; }
         public string? photo_url { get; set; }
         public string? nickname { get; set; }
-        public int? x { get; set; }
-        public int? y { get; set; }
-        public bool Status { get; set; } = false;
-        public string? direction { get; set; }
+        public int x { get; set; } = 0;
+        public int y { get; set; } = 0;
+        public AgentStatus Status { get; set; } = AgentStatus.NotOnBoard;
     }
 }

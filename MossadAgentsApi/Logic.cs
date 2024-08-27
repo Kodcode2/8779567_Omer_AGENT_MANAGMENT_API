@@ -1,40 +1,50 @@
-﻿using MossadAgentsApi.Models;
+﻿using MossadAgentsApi.Data;
+using MossadAgentsApi.Models;
+using System;
 
 namespace MossadAgentsApi
 {
     public class Logic
     {
-        public enum Direction
+        private readonly ApplicationDbContext _context;
+        public static int Xlenght = 1000;
+         public static int Ylenght = 1000;
+
+        public enum TargetStatus
         {
-            NW,
-            N,
-            NE,
-            E,
-            SE,
-            S,
-            SW,
-            W
+            IsAlive = 1,
+            OnCatch = 2,
+            IsDead = 3    
         }
 
-        public List<Mission> AgentToTarget(List<Agent> agents, List<Target> targets)
+
+
+        public static List<Mission> AgentToTarget(List<Agent> agents, List<Target> targets)
         {
-            List<Mission> CurrentMissions = new List<Mission>();
+            List<Mission> CurrentMissions = new List<Mission>();       
+            
+            targets= targets.Where(target => target.Status == 1 ).Where(target => target.x != 0).ToList();
+          
             foreach (Agent agent in agents)
             {
+                if(agent.Status != Enum.AgentStatus.WaitForMission)
+                {
+                    continue;
+                }
                 foreach (Target target in targets)
                 {
-                    if (!agent.Status)
+                    //if ( agent.Status == false)
+                    //{
+                    double Distance = Math.Sqrt(Math.Pow(Convert.ToDouble(agent.x) - Convert.ToDouble(target.x), 2) + Math.Pow(Convert.ToDouble(agent.y) - Convert.ToDouble(target.y), 2));
+                    if (Distance <= 200)
                     {
-                        double Distance = Math.Sqrt(Math.Pow(Convert.ToDouble(agent.x) - Convert.ToDouble(target.x), 2) + Math.Pow(Convert.ToDouble(agent.y) - Convert.ToDouble(target.y), 2));
-                        if (Distance <= 200)
-                        {
-                            Mission mission = new Mission();
-                            mission.agentId = agent.Id;
-                            mission.targetId = target.Id;
-                            mission.TimeToTarget = Convert.ToInt32(Distance / 40);
-                            CurrentMissions.Add(mission);
-                        }
+                        Mission mission = new Mission();
+                        mission.agentId = agent.Id;
+                        mission.targetId = target.Id;
+                        mission.TimeToTarget = Convert.ToInt32(Distance / 40);
+                        CurrentMissions.Add(mission);
                     }
+                    //}
 
                 }
             }
@@ -42,48 +52,48 @@ namespace MossadAgentsApi
             return CurrentMissions;
         }
 
-        public void MoveAgentOrTarget(ref int x, ref int y, Direction direction)
+        public static void MoveAgentOrTarget(ref int x, ref int y, string direction)
         {
             switch (direction)
             {
-                case Direction.NW:
+                case "nw":
                     {
                         x--; y++;
                     }
                     break;
-                case Direction.N:
+                case "n":
                     {
                         y++;
                     }
                     break;
-                case Direction.NE:
+                case "ne":
                     {
                         x++; y++;
                     }
                     break;
-                case Direction.E:
+                case "e":
                     {
                         x++;
                     }
                     break;
-                case Direction.SE:
+                case "se":
                     {
                         x++; y--;
                     }
                     break;
-                case Direction.S:
+                case "s":
                     {
                         y--;
                     }
                     break;
-                case Direction.SW:
+                case "sw":
                     {
                         x--; y--;
                     }
                     break;
-                case Direction.W:
+                case "w":
                     {
-                        x--; ;
+                        x--; 
                     }
                     break;
                 default:
@@ -92,13 +102,14 @@ namespace MossadAgentsApi
             }
         }
 
-        public Agent MoveAgentToTarget(ref Agent agent, Target target)
+        public static void MoveAgentAfterTarget(ref Agent agent, Target target)
         {
+          
             if (agent.x > target.x)
             {
                 agent.x--;
             }
-            if (agent.x > target.x)
+            if (agent.x < target.x)
             {
                 agent.x++;
             }
@@ -110,6 +121,24 @@ namespace MossadAgentsApi
             {
                 agent.y++;
             }
+
+        }
+
+        public static List<Mission> MissionsToRemoveAfterAssigned(List<Mission> missions , Mission AssigneMission)
+        { 
+            List<Mission> missionsToRemove = new List<Mission>();
+            foreach (Mission mission in missions)
+            {
+                if (mission.status ==  Enum.MissionsStatus.option)
+                {
+                    if (mission.agentId == AssigneMission.agentId || mission.targetId == AssigneMission.targetId)
+                    {
+                        missionsToRemove.Add(mission);
+                    }
+                }
+                
+            }
+            return missionsToRemove;
         }
     }
 }
